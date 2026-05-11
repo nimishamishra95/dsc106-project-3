@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Earth's Warming — CMIP6 Historical Temperature</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0a0a0f;
+    --surface:   #12121a;
+    --border:    #1e1e2e;
+    --accent:    #e67e22;
+    --text:      #d4cfc4;
+    --muted:     #6b6860;
+    --neutral:   #e8d5a3;
+    --font-disp: 'Bebas Neue', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    overflow: hidden;
+  }
+
+  #app {
+    display: grid;
+    grid-template-rows: auto 1fr auto auto;
+    height: 100vh;
+    padding: 18px 24px 14px;
+    gap: 10px;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 18px;
+  }
+  header h1 {
+    font-family: var(--font-disp);
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    letter-spacing: 0.04em;
+    line-height: 1;
+    color: #fff;
+  }
+  header h1 span { color: var(--accent); }
+  #year-display {
+    font-family: var(--font-disp);
+    font-size: clamp(1.6rem, 3vw, 2.6rem);
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    min-width: 5ch;
+  }
+  #global-anomaly {
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    margin-left: auto;
+    text-align: right;
+    line-height: 1.6;
+  }
+  #global-anomaly strong {
+    font-size: 1.1rem;
+    color: var(--neutral);
+    display: block;
+  }
+
+  /* ── Map container ── */
+  #map-wrap {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: #07091a;
+  }
+
+  #grid-canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+
+  #map-svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+
+  .graticule  { fill: none; stroke: #ffffff08; stroke-width: 0.5; }
+  .sphere     { fill: none; stroke: #ffffff30; stroke-width: 1; }
+  .countries  { fill: none; stroke: #ffffffa0; stroke-width: 0.5; }
+  .coastline  { fill: none; stroke: #ffffffc0; stroke-width: 0.9; }
+
+  .city-dot {
+    stroke: #fff;
+    stroke-width: 1.4;
+    cursor: pointer;
+    filter: drop-shadow(0 0 4px rgba(0,0,0,0.9));
+  }
+  .city-dot:hover { stroke-width: 2.5; }
+  .city-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    fill: #ffffffdd;
+    pointer-events: none;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Legend ── */
+  #legend {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+  }
+  #legend-bar { height: 8px; width: 200px; border-radius: 2px; flex-shrink: 0; }
+  .legend-label { white-space: nowrap; }
+
+  /* ── Controls ── */
+  #controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  #play-btn {
+    background: none;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: var(--font-disp);
+    font-size: 1rem;
+    letter-spacing: 0.1em;
+    padding: 4px 14px;
+    border-radius: 2px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+  }
+  #play-btn:hover { background: var(--accent); color: #000; }
+
+  #slider {
+    -webkit-appearance: none; appearance: none;
+    flex: 1; height: 3px;
+    background: var(--border);
+    border-radius: 2px; outline: none; cursor: pointer;
+  }
+  #slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); border: 2px solid #fff; cursor: pointer;
+  }
+  #slider::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); border: 2px solid #fff; cursor: pointer;
+  }
+  .year-tick { font-size: 0.6rem; color: var(--muted); flex-shrink: 0; }
+
+  /* ── Tooltip ── */
+  #tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: #0e0e1af2;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    padding: 12px 14px;
+    min-width: 220px;
+    display: none;
+    z-index: 100;
+    backdrop-filter: blur(8px);
+  }
+  #tooltip h3 {
+    font-family: var(--font-disp);
+    font-size: 1.3rem; color: #fff;
+    letter-spacing: 0.08em; margin-bottom: 6px;
+  }
+  .tt-row {
+    display: flex; justify-content: space-between;
+    font-size: 0.68rem; color: var(--muted); margin-bottom: 3px;
+  }
+  .tt-row span:last-child { color: var(--text); }
+  #tt-chart { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+  #tt-svg { display: block; }
+
+  /* ── Loading ── */
+  #loading {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 999; gap: 16px;
+  }
+  #loading h2 {
+    font-family: var(--font-disp); font-size: 2rem;
+    letter-spacing: 0.12em; color: var(--accent);
+  }
+  #loading p { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.08em; }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <h2>LOADING CLIMATE DATA</h2>
+  <p id="load-msg">Initialising...</p>
+</div>
+
+<div id="app" style="opacity:0">
+  <header>
+    <h1>EARTH'S <span>WARMING</span></h1>
+    <div id="year-display">1850</div>
+    <div id="global-anomaly">
+      GLOBAL ANOMALY VS 1850–1900<br>
+      <strong id="anom-val">— °C</strong>
+    </div>
+  </header>
+
+  <div id="map-wrap">
+    <canvas id="grid-canvas"></canvas>
+    <svg id="map-svg"></svg>
+  </div>
+
+  <div id="legend">
+    <span class="legend-label">COOLER</span>
+    <canvas id="legend-bar" width="200" height="8"></canvas>
+    <span class="legend-label">WARMER</span>
+    <span style="margin-left:auto;font-size:0.6rem">
+      ANOMALY VS 1850–1900 BASELINE &nbsp;|&nbsp; CESM2 MODEL &nbsp;|&nbsp; CMIP6
+    </span>
+  </div>
+
+  <div id="controls">
+    <button id="play-btn">▶ PLAY</button>
+    <span class="year-tick">1850</span>
+    <input id="slider" type="range" min="1850" max="2014" value="1850" step="1"/>
+    <span class="year-tick">2014</span>
+  </div>
+</div>
+
+<div id="tooltip">
+  <h3 id="tt-city"></h3>
+  <div class="tt-row"><span>TEMPERATURE</span><span id="tt-tas"></span></div>
+  <div class="tt-row"><span>ANOMALY</span><span id="tt-anom"></span></div>
+  <div class="tt-row"><span>COORDINATES</span><span id="tt-coords"></span></div>
+  <div id="tt-chart">
+    <svg id="tt-svg" width="192" height="64"></svg>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+//  COLOR SCALE
+// ══════════════════════════════════════════
+const ANOM_MIN = -4, ANOM_MAX = 5;
+
+const colorScale = d3.scaleSequential()
+  .domain([ANOM_MIN, ANOM_MAX])
+  .interpolator(d3.interpolateRgbBasis([
+    "#08306b","#1a6b8a","#2196a8","#56b4cc",
+    "#a8d5e2","#f7f3e3","#f0a500","#e05c00","#c0392b","#7b1010"
+  ]));
+
+// Legend bar
+(function() {
+  const c = document.getElementById("legend-bar");
+  const ctx = c.getContext("2d");
+  for (let i = 0; i < 200; i++) {
+    const t = ANOM_MIN + (i / 200) * (ANOM_MAX - ANOM_MIN);
+    ctx.fillStyle = colorScale(t);
+    ctx.fillRect(i, 0, 1, 8);
+  }
+})();
+
+// ══════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════
+let currentYear = 1850;
+let playing     = false;
+let timer       = null;
+let gridByYear  = {};
+let citiesData  = {};
+let projection, pathGen;
+let canvasCtx, spherePath2D;
+let W, H, dpr;
+let cellW, cellH;
+let cityBaselines = {};
+
+// ══════════════════════════════════════════
+//  LOAD
+// ══════════════════════════════════════════
+const loadMsg = document.getElementById("load-msg");
+
+async function loadAll() {
+  loadMsg.textContent = "Loading world topology...";
+  const world = await d3.json(
+    "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"
+  );
+
+  loadMsg.textContent = "Loading city timeseries...";
+  citiesData = await d3.json("cmip6_cities_clean.json");
+
+  loadMsg.textContent = "Loading temperature grid (38 MB — please wait)...";
+  const grid = await d3.json("cmip6_grid_clean.json");
+
+  loadMsg.textContent = "Indexing by year...";
+  for (const r of grid) {
+    if (!gridByYear[r.year]) gridByYear[r.year] = [];
+    gridByYear[r.year].push(r);
+  }
+
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("app").style.opacity = "1";
+  initViz(world);
+}
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+function initViz(world) {
+  const wrap   = document.getElementById("map-wrap");
+  const canvas = document.getElementById("grid-canvas");
+  const svg    = d3.select("#map-svg");
+
+  W = wrap.clientWidth;
+  H = wrap.clientHeight;
+  dpr = window.devicePixelRatio || 1;
+
+  // Size canvas in physical pixels
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvasCtx = canvas.getContext("2d");
+  canvasCtx.scale(dpr, dpr);
+
+  svg.attr("viewBox", `0 0 ${W} ${H}`);
+
+  // Projection
+  projection = d3.geoNaturalEarth1()
+    .scale(W / 6.2)
+    .translate([W / 2, H / 2]);
+
+  pathGen = d3.geoPath().projection(projection);
+
+  // Build sphere clip path for canvas
+  const spherePathStr = pathGen({type:"Sphere"});
+  const path2d = new Path2D(spherePathStr);
+  spherePath2D = path2d;
+
+  // Compute cell size: our grid is 5° stride
+  // measure a 5° step in pixel space at center of map
+  const p0 = projection([0,   0]);
+  const p1 = projection([5,   0]);
+  const p2 = projection([0,   5]);
+  cellW = Math.abs(p1[0] - p0[0]) + 1.5;
+  cellH = Math.abs(p2[1] - p0[1]) + 1.5;
+
+  // ── SVG: graticule + borders only (no fills) ────────────
+  svg.append("path").datum({type:"Sphere"})
+    .attr("class","sphere").attr("d", pathGen);
+
+  svg.append("path")
+    .datum(d3.geoGraticule()())
+    .attr("class","graticule").attr("d", pathGen);
+
+  // Internal country borders
+  svg.append("path")
+    .datum(topojson.mesh(world, world.objects.countries, (a,b) => a !== b))
+    .attr("class","countries").attr("d", pathGen);
+
+  // Outer coastlines
+  svg.append("path")
+    .datum(topojson.mesh(world, world.objects.countries, (a,b) => a === b))
+    .attr("class","coastline").attr("d", pathGen);
+
+  // City layer
+  const cityLayer = svg.append("g").attr("id","city-layer");
+
+  // Precompute city baselines (mean tas 1850–1900)
+  for (const [name, c] of Object.entries(citiesData)) {
+    const base = c.data.filter(d => d.year >= 1850 && d.year <= 1900);
+    cityBaselines[name] = base.length ? d3.mean(base, d => d.tas) : 0;
+  }
+
+  // ══════════════════════════════════════
+  //  RENDER YEAR
+  // ══════════════════════════════════════
+  function renderYear(year) {
+    const records = gridByYear[year] || [];
+
+    // 1. Clear + ocean background clipped to sphere
+    canvasCtx.clearRect(0, 0, W, H);
+    canvasCtx.save();
+    canvasCtx.clip(spherePath2D);
+    canvasCtx.fillStyle = "#07091a";
+    canvasCtx.fillRect(0, 0, W, H);
+
+    // 2. Draw temperature cells
+    for (const r of records) {
+      if (r.anomaly == null) continue;
+      const proj = projection([r.lon, r.lat]);
+      if (!proj) continue;
+      canvasCtx.fillStyle = colorScale(r.anomaly);
+      canvasCtx.fillRect(
+        proj[0] - cellW / 2,
+        proj[1] - cellH / 2,
+        cellW, cellH
+      );
+    }
+    canvasCtx.restore();
+
+    // 3. City dots
+    const cityArr = Object.entries(citiesData).map(([name, c]) => {
+      const pt = c.data.find(d => d.year === year);
+      return { name, lat: c.lat, lon: c.lon, tas: pt ? pt.tas : null };
+    });
+
+    const dots = cityLayer.selectAll(".city-dot")
+      .data(cityArr, d => d.name);
+
+    dots.enter().append("circle")
+      .attr("class","city-dot")
+      .attr("r", 5)
+      .on("mousemove", (event, d) => showTooltip(event, d, year))
+      .on("mouseleave", hideTooltip)
+      .merge(dots)
+      .attr("cx", d => projection([d.lon, d.lat])[0])
+      .attr("cy", d => projection([d.lon, d.lat])[1])
+      .attr("fill", d => d.tas != null
+        ? colorScale(d.tas - cityBaselines[d.name]) : "#888");
+
+    dots.exit().remove();
+
+    // 4. Labels
+    const LABELED = ["San Diego","London","Tokyo","Arctic","Sydney","Cairo","Mumbai"];
+    cityLayer.selectAll(".city-label").remove();
+    cityLayer.selectAll(".city-label")
+      .data(cityArr.filter(d => LABELED.includes(d.name)))
+      .enter().append("text")
+      .attr("class","city-label")
+      .attr("x", d => projection([d.lon, d.lat])[0] + 7)
+      .attr("y", d => projection([d.lon, d.lat])[1] + 3)
+      .text(d => d.name.toUpperCase());
+
+    // 5. Global anomaly header
+    const anoms = records.filter(r => r.anomaly != null).map(r => r.anomaly);
+    const mean  = anoms.length ? anoms.reduce((a,b)=>a+b,0)/anoms.length : 0;
+    const sign  = mean >= 0 ? "+" : "";
+    const el    = document.getElementById("anom-val");
+    el.textContent = `${sign}${mean.toFixed(2)} °C`;
+    el.style.color = mean > 1 ? "#e05c00" : mean > 0.3 ? "#e8d5a3" : "#56b4cc";
+
+    document.getElementById("year-display").textContent = year;
+  }
+
+  // ══════════════════════════════════════
+  //  TOOLTIP + SPARKLINE
+  // ══════════════════════════════════════
+  const tt = document.getElementById("tooltip");
+
+  function showTooltip(event, d, year) {
+    const c    = citiesData[d.name];
+    const pt   = c.data.find(r => r.year === year);
+    const base = cityBaselines[d.name];
+    const anom = pt ? pt.tas - base : null;
+    const sign = anom != null ? (anom >= 0 ? "+" : "") : "";
+
+    document.getElementById("tt-city").textContent   = d.name.toUpperCase();
+    document.getElementById("tt-tas").textContent    = pt   ? `${pt.tas.toFixed(2)} °C` : "—";
+    document.getElementById("tt-anom").textContent   = anom != null ? `${sign}${anom.toFixed(2)} °C` : "—";
+    document.getElementById("tt-coords").textContent = `${d.lat.toFixed(1)}°, ${d.lon.toFixed(1)}°`;
+
+    drawSparkline(c.data, year, base);
+    tt.style.display = "block";
+    positionTooltip(event);
+  }
+
+  function hideTooltip() { tt.style.display = "none"; }
+
+  function positionTooltip(event) {
+    const pad = 14;
+    let x = event.clientX + pad;
+    let y = event.clientY + pad;
+    if (x + tt.offsetWidth  > window.innerWidth)  x = event.clientX - tt.offsetWidth  - pad;
+    if (y + tt.offsetHeight > window.innerHeight)  y = event.clientY - tt.offsetHeight - pad;
+    tt.style.left = x + "px";
+    tt.style.top  = y + "px";
+  }
+
+  document.addEventListener("mousemove", e => {
+    if (tt.style.display === "block") positionTooltip(e);
+  });
+
+  function drawSparkline(data, activeYear, baseline) {
+    const s = d3.select("#tt-svg");
+    s.selectAll("*").remove();
+    const W2=192, H2=64, pad=6;
+
+    const xs = d3.scaleLinear().domain([1850,2014]).range([pad, W2-pad]);
+    const ext = d3.extent(data, d => d.tas - baseline);
+    const ys = d3.scaleLinear()
+      .domain([Math.min(ext[0], -0.5), Math.max(ext[1], 0.5)])
+      .range([H2-pad, pad]);
+
+    // Zero line
+    s.append("line")
+      .attr("x1",pad).attr("x2",W2-pad)
+      .attr("y1",ys(0)).attr("y2",ys(0))
+      .attr("stroke","#ffffff22").attr("stroke-width",0.8)
+      .attr("stroke-dasharray","3,3");
+
+    // Area fill
+    s.append("path").datum(data)
+      .attr("fill","#e67e2218")
+      .attr("d", d3.area()
+        .x(d => xs(d.year))
+        .y0(ys(0))
+        .y1(d => ys(d.tas - baseline))
+        .curve(d3.curveBasis));
+
+    // Line
+    s.append("path").datum(data)
+      .attr("fill","none")
+      .attr("stroke","#e8d5a3")
+      .attr("stroke-width",1.4)
+      .attr("d", d3.line()
+        .x(d => xs(d.year))
+        .y(d => ys(d.tas - baseline))
+        .curve(d3.curveBasis));
+
+    // Active year dot + vertical rule
+    const active = data.find(d => d.year === activeYear);
+    if (active) {
+      const ax = xs(active.year), ay = ys(active.tas - baseline);
+      s.append("line")
+        .attr("x1",ax).attr("x2",ax)
+        .attr("y1",pad).attr("y2",H2-pad)
+        .attr("stroke","#ffffff28").attr("stroke-width",1);
+      s.append("circle")
+        .attr("cx",ax).attr("cy",ay).attr("r",3.5)
+        .attr("fill", colorScale(active.tas - baseline))
+        .attr("stroke","#fff").attr("stroke-width",1.2);
+    }
+
+    // Axis labels
+    [["1850", pad, "start"], ["2014", W2-pad, "end"]].forEach(([label,x,anchor]) => {
+      s.append("text")
+        .attr("x",x).attr("y",H2-1)
+        .attr("fill","#6b6860").attr("font-size","7px")
+        .attr("font-family","DM Mono, monospace")
+        .attr("text-anchor", anchor)
+        .text(label);
+    });
+  }
+
+  // ══════════════════════════════════════
+  //  SLIDER + PLAY
+  // ══════════════════════════════════════
+  const slider  = document.getElementById("slider");
+  const playBtn = document.getElementById("play-btn");
+
+  slider.addEventListener("input", () => {
+    currentYear = +slider.value;
+    renderYear(currentYear);
+  });
+
+  playBtn.addEventListener("click", () => {
+    playing = !playing;
+    playBtn.textContent = playing ? "⏸ PAUSE" : "▶ PLAY";
+    if (playing) {
+      if (currentYear >= 2014) { currentYear = 1850; slider.value = 1850; }
+      timer = d3.interval(() => {
+        currentYear++;
+        slider.value = currentYear;
+        renderYear(currentYear);
+        if (currentYear >= 2014) {
+          playing = false;
+          playBtn.textContent = "▶ PLAY";
+          timer.stop();
+        }
+      }, 100);
+    } else {
+      if (timer) timer.stop();
+    }
+  });
+
+  renderYear(1850);
+}
+
+// Bootstrap
+const topoScript = document.createElement("script");
+topoScript.src = "https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js";
+topoScript.onload = loadAll;
+document.head.appendChild(topoScript);
+</script>
+</body>
+</html>
