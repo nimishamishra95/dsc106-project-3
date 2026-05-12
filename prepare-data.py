@@ -42,5 +42,5 @@ with open("cmip6_cities_clean.json", "w") as f:
     json.dump(cities, f, separators=(",", ":"))
 
 size = os.path.getsize("cmip6_grid_clean.json") / 1e6
-print(f"\n✅ cmip6_grid_clean.json   ({size:.1f} MB)")
-print(f"✅ cmip6_cities_clean.json  ({os.path.getsize('cmip6_cities_clean.json')/1e3:.1f} KB)")
+print(f"\ncmip6_grid_clean.json   ({size:.1f} MB)")
+print(f"cmip6_cities_clean.json  ({os.path.getsize('cmip6_cities_clean.json')/1e3:.1f} KB)")
