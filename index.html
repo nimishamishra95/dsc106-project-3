@@ -37,7 +37,6 @@
     gap: 10px;
   }
 
-  /* ── Header ── */
   header {
     display: flex;
     align-items: baseline;
@@ -72,7 +71,6 @@
     display: block;
   }
 
-  /* ── Map container ── */
   #map-wrap {
     position: relative;
     overflow: hidden;
@@ -113,7 +111,6 @@
     letter-spacing: 0.05em;
   }
 
-  /* ── Legend ── */
   #legend {
     display: flex;
     align-items: center;
@@ -125,7 +122,6 @@
   #legend-bar { height: 8px; width: 200px; border-radius: 2px; flex-shrink: 0; }
   .legend-label { white-space: nowrap; }
 
-  /* ── Controls ── */
   #controls {
     display: flex;
     align-items: center;
@@ -163,7 +159,6 @@
   }
   .year-tick { font-size: 0.6rem; color: var(--muted); flex-shrink: 0; }
 
-  /* ── Tooltip ── */
   #tooltip {
     position: fixed;
     pointer-events: none;
@@ -189,7 +184,6 @@
   #tt-chart { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
   #tt-svg { display: block; }
 
-  /* ── Loading ── */
   #loading {
     position: fixed; inset: 0;
     background: var(--bg);
@@ -214,13 +208,7 @@
 </head>
 <body>
 
-<div id="loading">
-  <div class="spinner"></div>
-  <h2>LOADING CLIMATE DATA</h2>
-  <p id="load-msg">Initialising...</p>
-</div>
-
-<div id="app" style="opacity:0">
+<div id="app">
   <header>
     <h1>EARTH'S <span>WARMING</span></h1>
     <div id="year-display">1850</div>
@@ -306,25 +294,19 @@ let cityBaselines = {};
 const loadMsg = document.getElementById("load-msg");
 
 async function loadAll() {
-  loadMsg.textContent = "Loading world topology...";
   const world = await d3.json(
     "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json"
   );
 
-  loadMsg.textContent = "Loading city timeseries...";
   citiesData = await d3.json("cmip6_cities_clean.json");
 
-  loadMsg.textContent = "Loading temperature grid (38 MB — please wait)...";
   const grid = await d3.json("cmip6_grid_clean.json");
 
-  loadMsg.textContent = "Indexing by year...";
   for (const r of grid) {
     if (!gridByYear[r.year]) gridByYear[r.year] = [];
     gridByYear[r.year].push(r);
   }
 
-  document.getElementById("loading").style.display = "none";
-  document.getElementById("app").style.opacity = "1";
   initViz(world);
 }
 
