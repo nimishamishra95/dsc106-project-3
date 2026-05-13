@@ -26,13 +26,15 @@
     background: var(--bg);
     color: var(--text);
     font-family: var(--font-mono);
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   #app {
     display: grid;
     grid-template-rows: auto 1fr auto auto;
     height: 100vh;
+    min-height: 500px;
     padding: 18px 24px 14px;
     gap: 10px;
   }
@@ -204,6 +206,113 @@
     animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── WRITE-UP SECTION ─────────────────────────────── */
+  #writeup {
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    padding: 48px 24px 64px;
+  }
+
+  #writeup-inner {
+    max-width: 860px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px 56px;
+  }
+
+  .writeup-header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 14px;
+    margin-bottom: 4px;
+  }
+
+  .writeup-header h2 {
+    font-family: var(--font-disp);
+    font-size: clamp(1.6rem, 3vw, 2.4rem);
+    letter-spacing: 0.06em;
+    color: #fff;
+  }
+
+  .writeup-header h2 span { color: var(--accent); }
+
+  .writeup-tag {
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    border: 1px solid var(--border);
+    padding: 2px 8px;
+    border-radius: 2px;
+  }
+
+  .writeup-block h3 {
+    font-family: var(--font-disp);
+    font-size: 1.1rem;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .writeup-block h3::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .writeup-block p {
+    font-size: 0.75rem;
+    line-height: 1.85;
+    color: var(--text);
+    margin-bottom: 12px;
+  }
+
+  .writeup-block p:last-child { margin-bottom: 0; }
+
+  .writeup-block p em {
+    color: var(--neutral);
+    font-style: normal;
+  }
+
+  .writeup-pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .writeup-pill {
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 3px 9px;
+    background: var(--surface);
+  }
+
+  .writeup-divider {
+    grid-column: 1 / -1;
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+  }
+
+  @media (max-width: 640px) {
+    #writeup-inner {
+      grid-template-columns: 1fr;
+      gap: 36px;
+    }
+    .writeup-header { flex-wrap: wrap; }
+  }
 </style>
 </head>
 <body>
@@ -239,6 +348,33 @@
     <span class="year-tick">2014</span>
   </div>
 </div>
+
+<!-- ── WRITE-UP ──────────────────────────────────────── -->
+<section id="writeup">
+  <div id="writeup-inner">
+
+    <div class="writeup-header">
+      <h2>ABOUT THIS <span>PROJECT</span></h2>
+    </div>
+
+    <div class="writeup-block">
+      <h3>DESIGN RATIONALE</h3>
+      <p>
+        <!-- Beliz's writing here -->
+      </p>
+      
+    </div>
+
+    <div class="writeup-block">
+      <h3>DEVELOPMENT PROCESS</h3>
+      <p>
+        For this project, we found the project checkpoint to be quite useful and guiding in getting us to our final product. Exploring multiple design routes as we approached this creative assignment was essential to landing on a concept that maximized the potential of D3 interaction, and the detailed data at hand in CMIP6’s dataset. This section of our process was split evenly with each member of our group completing 1-2 noninteractive graphs and examining the pros and cons of each other's drafts. Luckily, everyone shared the same opinion that the world map experimental visualization would be the most visually interesting and insightful when paired with user interaction capabilities. We then began experimenting with D3, keeping the same idea from our chosen map visualization, but specifically aiming to incorporate a year slider and an annotation clicker for certain points on the map. For this section, we all got together and worked in our own local environments, while sharing ideas aloud and sending files back and forth. We found this form of face to face collaboration to be extremely productive. Between the four of us, we were able to build our visualization and website in about 6 hours across a couple days. Most of this time was spent either straightening out our dataset or fiddling with D3 features so they were easy to use and fit well with the application. Overall, we are very pleased with our development process and the collaboration experience it provided us.
+      </p>
+
+    </div>
+
+  </div>
+</section>
 
 <div id="tooltip">
   <h3 id="tt-city"></h3>
@@ -322,7 +458,6 @@ function initViz(world) {
   H = wrap.clientHeight;
   dpr = window.devicePixelRatio || 1;
 
-  // Size canvas in physical pixels
   canvas.width  = W * dpr;
   canvas.height = H * dpr;
   canvasCtx = canvas.getContext("2d");
@@ -330,27 +465,22 @@ function initViz(world) {
 
   svg.attr("viewBox", `0 0 ${W} ${H}`);
 
-  // Projection
   projection = d3.geoNaturalEarth1()
     .scale(W / 6.2)
     .translate([W / 2, H / 2]);
 
   pathGen = d3.geoPath().projection(projection);
 
-  // Build sphere clip path for canvas
   const spherePathStr = pathGen({type:"Sphere"});
   const path2d = new Path2D(spherePathStr);
   spherePath2D = path2d;
 
-  // Compute cell size: our grid is 5° stride
-  // measure a 5° step in pixel space at center of map
   const p0 = projection([0,   0]);
   const p1 = projection([5,   0]);
   const p2 = projection([0,   5]);
   cellW = Math.abs(p1[0] - p0[0]) + 1.5;
   cellH = Math.abs(p2[1] - p0[1]) + 1.5;
 
-  // ── SVG: graticule + borders only (no fills) ────────────
   svg.append("path").datum({type:"Sphere"})
     .attr("class","sphere").attr("d", pathGen);
 
@@ -358,20 +488,16 @@ function initViz(world) {
     .datum(d3.geoGraticule()())
     .attr("class","graticule").attr("d", pathGen);
 
-  // Internal country borders
   svg.append("path")
     .datum(topojson.mesh(world, world.objects.countries, (a,b) => a !== b))
     .attr("class","countries").attr("d", pathGen);
 
-  // Outer coastlines
   svg.append("path")
     .datum(topojson.mesh(world, world.objects.countries, (a,b) => a === b))
     .attr("class","coastline").attr("d", pathGen);
 
-  // City layer
   const cityLayer = svg.append("g").attr("id","city-layer");
 
-  // Precompute city baselines (mean tas 1850–1900)
   for (const [name, c] of Object.entries(citiesData)) {
     const base = c.data.filter(d => d.year >= 1850 && d.year <= 1900);
     cityBaselines[name] = base.length ? d3.mean(base, d => d.tas) : 0;
@@ -383,14 +509,12 @@ function initViz(world) {
   function renderYear(year) {
     const records = gridByYear[year] || [];
 
-    // 1. Clear + ocean background clipped to sphere
     canvasCtx.clearRect(0, 0, W, H);
     canvasCtx.save();
     canvasCtx.clip(spherePath2D);
     canvasCtx.fillStyle = "#07091a";
     canvasCtx.fillRect(0, 0, W, H);
 
-    // 2. Draw temperature cells
     for (const r of records) {
       if (r.anomaly == null) continue;
       const proj = projection([r.lon, r.lat]);
@@ -404,7 +528,6 @@ function initViz(world) {
     }
     canvasCtx.restore();
 
-    // 3. City dots
     const cityArr = Object.entries(citiesData).map(([name, c]) => {
       const pt = c.data.find(d => d.year === year);
       return { name, lat: c.lat, lon: c.lon, tas: pt ? pt.tas : null };
@@ -426,7 +549,6 @@ function initViz(world) {
 
     dots.exit().remove();
 
-    // 4. Labels
     const LABELED = ["San Diego","London","Tokyo","Arctic","Sydney","Cairo","Mumbai"];
     cityLayer.selectAll(".city-label").remove();
     cityLayer.selectAll(".city-label")
@@ -437,7 +559,6 @@ function initViz(world) {
       .attr("y", d => projection([d.lon, d.lat])[1] + 3)
       .text(d => d.name.toUpperCase());
 
-    // 5. Global anomaly header
     const anoms = records.filter(r => r.anomaly != null).map(r => r.anomaly);
     const mean  = anoms.length ? anoms.reduce((a,b)=>a+b,0)/anoms.length : 0;
     const sign  = mean >= 0 ? "+" : "";
@@ -497,14 +618,12 @@ function initViz(world) {
       .domain([Math.min(ext[0], -0.5), Math.max(ext[1], 0.5)])
       .range([H2-pad, pad]);
 
-    // Zero line
     s.append("line")
       .attr("x1",pad).attr("x2",W2-pad)
       .attr("y1",ys(0)).attr("y2",ys(0))
       .attr("stroke","#ffffff22").attr("stroke-width",0.8)
       .attr("stroke-dasharray","3,3");
 
-    // Area fill
     s.append("path").datum(data)
       .attr("fill","#e67e2218")
       .attr("d", d3.area()
@@ -513,7 +632,6 @@ function initViz(world) {
         .y1(d => ys(d.tas - baseline))
         .curve(d3.curveBasis));
 
-    // Line
     s.append("path").datum(data)
       .attr("fill","none")
       .attr("stroke","#e8d5a3")
@@ -523,7 +641,6 @@ function initViz(world) {
         .y(d => ys(d.tas - baseline))
         .curve(d3.curveBasis));
 
-    // Active year dot + vertical rule
     const active = data.find(d => d.year === activeYear);
     if (active) {
       const ax = xs(active.year), ay = ys(active.tas - baseline);
@@ -537,7 +654,6 @@ function initViz(world) {
         .attr("stroke","#fff").attr("stroke-width",1.2);
     }
 
-    // Axis labels
     [["1850", pad, "start"], ["2014", W2-pad, "end"]].forEach(([label,x,anchor]) => {
       s.append("text")
         .attr("x",x).attr("y",H2-1)
